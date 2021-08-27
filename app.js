@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const date = require(__dirname + "/date.js");
+const _ = require("lodash");
 
 const app = express();
 
@@ -63,8 +64,8 @@ app.get("/", function(req, res) {
 
         }
 
-        let day = date.getDate();
-        res.render("list", {listTitle : day, newListItems : foundItems});
+        
+        res.render("list", {listTitle : "Today", newListItems : foundItems});
         
     });
 
@@ -73,32 +74,61 @@ app.get("/", function(req, res) {
 app.post("/", function(req, res) {
 
     const itemName = req.body.newItem;
+    const listName = req.body.list;
 
     const item = new Item({
 
         name : itemName
     });
 
+    if(listName === "Today"){      
     item.save();
 
     res.redirect("/");
+
+    }
+    else
+    { 
+        List.findOne({name : listName}, function(err,foundList){
+            foundList.items.push(item);
+            foundList.save();
+
+            res.redirect("/" + listName);
+
+        });
+    }
+
 
 });
 
 app.post("/delete", function(req, res) {
 
     const checkedItemId = req.body.checkbox;
+    const listName = req.body.listName;
 
-    Item.deleteOne({_id : checkedItemId}, function(err){
+    if(listName === "Today"){
 
-        console.log("Successfully Deleted Item");
-        res.redirect("/");
+        Item.deleteOne({_id : checkedItemId}, function(err){
 
-    });
+            console.log("Successfully Deleted Item");
+            res.redirect("/");
+    
+        });
+    }
+
+    else
+    { 
+        List.findOneAndUpdate({name : listName}, {$pull : {items : {_id : checkedItemId}}}, function(err, foundList){
+            if(!err)
+            {
+                res.redirect("/"+ listName);
+            }
+        });
+    }
 });
 
 app.get("/:customListName", function(req, res){
-    const customListName = req.params.customListName;
+    const customListName = _.capitalize(req.params.customListName);
 
     List.findOne({name : customListName}, function(err, foundList){
 
@@ -124,11 +154,7 @@ app.get("/:customListName", function(req, res){
     }
 
     });
-
-
-
 });
-
 
 app.listen(3000, function() {
 
